@@ -372,7 +372,15 @@ def get_zp_all_employees():
         for page_employee in page_employees:
             zp_employee_id = list(page_employee.keys())[0]
             zp_employee_data = page_employee[zp_employee_id][0]
-            result.append({"joining_date": zp_employee_data['Dateofjoining'], "exit_date": zp_employee_data["Dateofexit"], "terms": zp_employee_data['Terms_of_work'], "crm_id": zp_employee_data['CRM_Developer_ID'], "email": zp_employee_data['EmailID'], "department": zp_employee_data['Department'], 'id': zp_employee_data['Zoho_ID'], 'name': f'{zp_employee_data["FirstName"]} {zp_employee_data["LastName"]}', "team": zp_employee_data["Team"], "staff_type": zp_employee_data["Staff_type"], 'short_id': zp_employee_data['EmployeeID']})
+            # result.append({"joining_date": zp_employee_data['Dateofjoining'], "exit_date": zp_employee_data["Dateofexit"], "terms": zp_employee_data['Terms_of_work'], "crm_id": zp_employee_data['CRM_Developer_ID'], "email": zp_employee_data['EmailID'], "department": zp_employee_data['Department'], 'id': zp_employee_data['Zoho_ID'], 'name': f'{zp_employee_data["FirstName"]} {zp_employee_data["LastName"]}', "team": zp_employee_data["Team"], "staff_type": zp_employee_data["Staff_type"], 'short_id': zp_employee_data['EmployeeID']})
+            result.append({"joining_date": zp_employee_data['Dateofjoining'], "exit_date": zp_employee_data["Dateofexit"],
+                       "terms": zp_employee_data['Terms_of_work'], "crm_id": zp_employee_data['CRM_Developer_ID'],
+                       "email": zp_employee_data['EmailID'], "department": zp_employee_data['Department'],
+                       'id': zp_employee_data['Zoho_ID'],
+                       'name': f'{zp_employee_data["FirstName"]} {zp_employee_data["LastName"]}',
+                       "team": zp_employee_data["Team"], "staff_type": zp_employee_data["Staff_type"],
+                       'short_id': zp_employee_data['EmployeeID'], "employee_type": zp_employee_data['Employee_type']})
+
         s_index += 200
     return result
 

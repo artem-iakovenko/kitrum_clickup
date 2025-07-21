@@ -384,6 +384,7 @@ class LogSyncer:
                 "hours": format_hours(round(timelog_duration_hours, 2)),
                 "workItem": timelog_description,
                 "description": timelog_id,
+                "clickup_task_id": timelog_task_id
             }
             if zp_project_id not in time_by_projects:
                 time_by_projects[zp_project_id] = round(timelog_duration_hours, 2)
@@ -395,6 +396,9 @@ class LogSyncer:
 
         total_added = 0
         errors_detected = False
+
+        # TESTS:
+
         if current_zp_logs_to_delete:
             print("\tDeleting Old Timelogs from Zoho People...")
             delete_message = delete_time_tracked(current_zp_logs_to_delete)

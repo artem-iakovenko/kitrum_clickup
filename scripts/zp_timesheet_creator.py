@@ -120,7 +120,7 @@ def launch_timesheets_submit(start_date, end_date, users):
             handler.launcher()
         except:
             continue
-        send_slack_notification(SLACK_CHANNEL_TIMELOGS, f"Timesheets has been created in Zoho People for *{len(users)}* users")
+    send_slack_notification(SLACK_CHANNEL_TIMELOGS, f"Timesheets has been created in Zoho People for *{len(users)}* users")
 
 
 
