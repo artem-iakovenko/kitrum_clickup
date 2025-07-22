@@ -57,6 +57,7 @@ def create_resources():
     thread.start()
     return jsonify({'status': 'triggered'}), 200
 
+
 @app.route('/update_available_resources', methods=['POST'])
 def update_available_resources():
     print(f"Received Request Update Available Resources")

@@ -1,7 +1,7 @@
 # SLACK_CHANNEL_TIMELOGS = "U0107LHGLRJ"
 SLACK_CHANNEL_TIMELOGS = "C093CP2NK8A"
-# date_ranges = [{"start": '2025-07-01', "end": '2025-07-31'}, {"start": '2025-08-01', "end": '2025-08-31'}, {"start": '2025-09-01', "end": '2025-09-30'}]
-date_ranges = [{"start": '2025-10-01', "end": '2025-10-31'}, {"start": '2025-11-01', "end": '2025-11-30'}, {"start": '2025-12-01', "end": '2025-12-31'}]
+date_ranges = [{"start": '2025-07-01', "end": '2025-07-31'}, {"start": '2025-08-01', "end": '2025-08-31'}, {"start": '2025-09-01', "end": '2025-09-30'}]
+# date_ranges = [{"start": '2025-10-01', "end": '2025-10-31'}, {"start": '2025-11-01', "end": '2025-11-30'}, {"start": '2025-12-01', "end": '2025-12-31'}]
 
 current_mode = "New Start"
 type_mapping = {
