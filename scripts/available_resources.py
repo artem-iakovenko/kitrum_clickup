@@ -1,10 +1,10 @@
 import time
 from datetime import datetime, timedelta
-from credentials.api_creds import CLICKUP_HEADERS
 from zoho_api.api import api_request
 import requests
 import json
 from scripts.help_functions import datetime_str_to_unix, unix_to_date
+from secret_manager import access_secret
 
 PRIORITY_MAPPING = {
     "Low": "👀  Low",
@@ -41,6 +41,7 @@ CFS_MAPPING = {
 
 class AvailableResources:
     def __init__(self, cursor_date):
+        self.clickup_headers = {"Content-Type": "application/json", "Authorization": access_secret('kitrum-cloud', "clickup")}
         self.picklist_options = {}
         self.all_clickup_users = []
         self.zp_employees = []
@@ -62,11 +63,11 @@ class AvailableResources:
         return "\n".join(free_hours_list)
 
     def get_all_clickup_users(self):
-        response = requests.get("https://api.clickup.com/api/v2/team", headers=CLICKUP_HEADERS)
+        response = requests.get("https://api.clickup.com/api/v2/team", headers=self.clickup_headers)
         self.all_clickup_users = response.json()['teams'][0]['members']
 
     def get_list_picklists(self):
-        response = requests.get("https://api.clickup.com/api/v2/list/901202112299/field", headers=CLICKUP_HEADERS)
+        response = requests.get("https://api.clickup.com/api/v2/list/901202112299/field", headers=self.clickup_headers)
         time.sleep(1)
         fields = response.json()['fields']
         for field in fields:
@@ -111,7 +112,7 @@ class AvailableResources:
         )['data']
 
     def get_available_resources(self):
-        response = requests.get(f"https://api.clickup.com/api/v2/list/901202112299/task", headers=CLICKUP_HEADERS)
+        response = requests.get(f"https://api.clickup.com/api/v2/list/901202112299/task", headers=self.clickup_headers)
         self.available_resources = response.json()['tasks']
 
     def get_clickup_blocks(self):
@@ -121,7 +122,7 @@ class AvailableResources:
             {"field_id": "031efcab-a89c-4f7f-bb03-208b209943a9", "operator": "=", "value": "ed86b075-14fa-4983-a77a-3a3e3321f2ed"}
         ])
         due_date_param = str(datetime_str_to_unix(self.cursor_date, 2, 0))
-        response = requests.get(f"https://api.clickup.com/api/v2/list/901204930768/task?due_date_gt={due_date_param}&custom_fields={custom_fields_param}", headers=CLICKUP_HEADERS)
+        response = requests.get(f"https://api.clickup.com/api/v2/list/901204930768/task?due_date_gt={due_date_param}&custom_fields={custom_fields_param}", headers=self.clickup_headers)
         self.clickup_blocks = response.json()['tasks']
 
     def prepare_clickup_blocks(self):
@@ -301,13 +302,13 @@ class AvailableResources:
                 for custom_field in ar_task_data['custom_fields']:
                     if custom_field['id'] in ["88343262-ed95-4283-b899-13f68b232c63"]:
                         continue
-                    response = requests.post(f"https://api.clickup.com/api/v2/task/{available_resource_id}/field/{custom_field['id']}", headers=CLICKUP_HEADERS, json={'value': custom_field['value']})
+                    response = requests.post(f"https://api.clickup.com/api/v2/task/{available_resource_id}/field/{custom_field['id']}", headers=self.clickup_headers, json={'value': custom_field['value']})
                     print(f'\tUpdate CF Response: {response.status_code}')
                 self.involved_task_ids.append(available_resource_id)
             # CREATE RESOURCE
             else:
                 print('Creating New Resource')
-                response = requests.post("https://api.clickup.com/api/v2/list/901202112299/task", headers=CLICKUP_HEADERS, json=ar_task_data)
+                response = requests.post("https://api.clickup.com/api/v2/list/901202112299/task", headers=self.clickup_headers, json=ar_task_data)
                 created_task_id = response.json()['id']
                 print(f"Created Task ID: {created_task_id}")
                 self.involved_task_ids.append(created_task_id)
@@ -415,13 +416,13 @@ class AvailableResources:
                 for custom_field in ar_task_data['custom_fields']:
                     if custom_field['id'] in ["88343262-ed95-4283-b899-13f68b232c63"]:
                         continue
-                    response = requests.post(f"https://api.clickup.com/api/v2/task/{available_resource_id}/field/{custom_field['id']}", headers=CLICKUP_HEADERS, json={'value': custom_field['value']})
+                    response = requests.post(f"https://api.clickup.com/api/v2/task/{available_resource_id}/field/{custom_field['id']}", headers=self.clickup_headers, json={'value': custom_field['value']})
                     print(f'\tUpdate CF Response: {response.status_code}')
                 self.involved_task_ids.append(available_resource_id)
             # CREATE RESOURCE
             else:
                 print('Creating New Resource')
-                response = requests.post("https://api.clickup.com/api/v2/list/901202112299/task", headers=CLICKUP_HEADERS, json=ar_task_data)
+                response = requests.post("https://api.clickup.com/api/v2/list/901202112299/task", headers=self.clickup_headers, json=ar_task_data)
                 created_task_id = response.json()['id']
                 print(f"Created Task ID: {created_task_id}")
                 self.involved_task_ids.append(created_task_id)
@@ -435,11 +436,11 @@ class AvailableResources:
 
     def archive_tasks(self):
         for task_id in self.untouched_forms:
-            task_data = requests.get(f"https://api.clickup.com/api/v2/task/{task_id}", headers=CLICKUP_HEADERS)
+            task_data = requests.get(f"https://api.clickup.com/api/v2/task/{task_id}", headers=self.clickup_headers)
             task_creator_id = task_data.json()['creator']['id']
             if task_creator_id == 81706052:
                 task_update_data = {"status": "finished"}
-                close_task = requests.put(f"https://api.clickup.com/api/v2/task/{task_id}", headers=CLICKUP_HEADERS, json=task_update_data)
+                close_task = requests.put(f"https://api.clickup.com/api/v2/task/{task_id}", headers=self.clickup_headers, json=task_update_data)
                 print(f"Closing Task {task_id}. Status Code: {close_task.status_code}")
             else:
                 try:
@@ -455,7 +456,7 @@ class AvailableResources:
                 is_yesterday_or_earlier = dt.date() <= yesterday
                 if is_yesterday_or_earlier:
                     task_update_data = {"status": "finished"}
-                    close_task = requests.put(f"https://api.clickup.com/api/v2/task/{task_id}", headers=CLICKUP_HEADERS,
+                    close_task = requests.put(f"https://api.clickup.com/api/v2/task/{task_id}", headers=self.clickup_headers,
                                               json=task_update_data)
                     print(f"Closing Task {task_id}. Status Code: {close_task.status_code}")
 

@@ -3,9 +3,9 @@ from _datetime import datetime, timedelta
 import numpy as np
 from zoho_api.api import api_request
 import re
-from credentials.api_creds import CLICKUP_HEADERS, SLACK_HEADRES
 import requests
 import json
+from secret_manager import access_secret
 
 
 def get_timelogs(start_date, end_date):
@@ -38,12 +38,20 @@ def check_if_date_in_range(date_to_check, range_start, range_end):
 
 
 def get_slack_channel_members(channel_id):
-    response = requests.get(f"https://slack.com/api/conversations.members?channel={channel_id}", headers=SLACK_HEADRES)
+    slack_headers = {
+        "Content-Type": "application/json",
+        "Authorization": access_secret("kitrum-cloud", "slack")
+    }
+    response = requests.get(f"https://slack.com/api/conversations.members?channel={channel_id}", headers=slack_headers)
     return {"status": response.status_code, "json": response.json()}
 
 def send_slack_notification(channel_id, notification_text):
+    slack_headers = {
+        "Content-Type": "application/json",
+        "Authorization": access_secret("kitrum-cloud", "slack")
+    }
     post_data = {"channel": channel_id, "text": notification_text};
-    response = requests.post("https://slack.com/api/chat.postMessage", headers=SLACK_HEADRES, json=post_data)
+    response = requests.post("https://slack.com/api/chat.postMessage", headers=slack_headers, json=post_data)
     return {"status": response.status_code, "json": response.json()}
 
 
@@ -77,6 +85,8 @@ def push_timelogs_to_zp(timelogs):
             json=batch_post_data
         )
         output = response.json()['details']['output']
+        print(output)
+        print(timelogs)
         try:
             batch_added = json.loads(output)['response']['result']['addedTimelogIds']
         except:
@@ -106,27 +116,27 @@ def get_zp_logs(user_email, start_date, end_date):
     return user_zp_logs
 
 
-def clickup_update_task_data(task_id, task_data):
+def clickup_update_task_data(clickup_headers, task_id, task_data):
     response = requests.put(
         f"https://api.clickup.com/api/v2/task/{task_id}",
-        headers=CLICKUP_HEADERS,
+        headers=clickup_headers,
         json=task_data
     )
     return {"status": response.status_code, "data": response.json()}
 
 
-def clickup_update_cf(task_id, cf_id, cf_value):
-    response = requests.post(f"https://api.clickup.com/api/v2/task/{task_id}/field/{cf_id}", headers=CLICKUP_HEADERS, json={"value": cf_value})
+def clickup_update_cf(clickup_headers, task_id, cf_id, cf_value):
+    response = requests.post(f"https://api.clickup.com/api/v2/task/{task_id}/field/{cf_id}", headers=clickup_headers, json={"value": cf_value})
     return {"status": response.status_code, "data": response.json()}
 
 
-def clickup_create_task(list_id, task_data):
-    response = requests.post(f"https://api.clickup.com/api/v2/list/{list_id}/task", headers=CLICKUP_HEADERS,
+def clickup_create_task(clickup_headers, list_id, task_data):
+    response = requests.post(f"https://api.clickup.com/api/v2/list/{list_id}/task", headers=clickup_headers,
                              json=task_data)
     return response.json()
 
 
-def get_cf_option_id(custom_fields, custom_field_id, search_value):
+def get_cf_option_id(clickup_headers, custom_fields, custom_field_id, search_value):
     for custom_field in custom_fields:
         try:
             if custom_field['id'] != custom_field_id:
@@ -139,22 +149,22 @@ def get_cf_option_id(custom_fields, custom_field_id, search_value):
             pass
     return None
 
-def get_list_custom_fields(list_id):
-    response = requests.get("https://api.clickup.com/api/v2/list/" + list_id + "/field", headers=CLICKUP_HEADERS)
+def get_list_custom_fields(clickup_headers, list_id):
+    response = requests.get("https://api.clickup.com/api/v2/list/" + list_id + "/field", headers=clickup_headers)
     return response.json()['fields']
 
 
-def get_clickup_task_by_id(task_id):
-    response = requests.get(f"https://api.clickup.com/api/v2/task/{task_id}?include_subtasks=true", headers=CLICKUP_HEADERS)
+def get_clickup_task_by_id(clickup_headers, task_id):
+    response = requests.get(f"https://api.clickup.com/api/v2/task/{task_id}?include_subtasks=true", headers=clickup_headers)
     return response.json()
 
-def clickup_get_tasks(list_id, additional_params):
+def clickup_get_tasks(clickup_headers, list_id, additional_params):
     page = 0
     all_tasks = []
     while True:
         resources_response = requests.get(
             f'https://api.clickup.com/api/v2/list/{list_id}/task?page={page}{additional_params or ""}',
-            headers=CLICKUP_HEADERS)
+            headers=clickup_headers)
         page += 1
         if len(resources_response.json()['tasks']) == 0:
             break
@@ -163,8 +173,8 @@ def clickup_get_tasks(list_id, additional_params):
     return all_tasks
 
 
-def get_clickup_users():
-    response = requests.get("https://api.clickup.com/api/v2/team/", headers=CLICKUP_HEADERS)
+def get_clickup_users(clickup_headers):
+    response = requests.get("https://api.clickup.com/api/v2/team/", headers=clickup_headers)
     return response.json()['teams'][0]['members']
 
 def crm_get_records_from(module_name, cv_id):

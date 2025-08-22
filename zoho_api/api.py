@@ -1,15 +1,13 @@
-import time
 import json
 import requests
-from .auth import ZohoAuth
-from credentials.api_creds import zp_oauth, zb_oauth, zcrm_oauth, zc_oauth, success_status_codes
+from zoho_api.auth import ZohoAuth
+success_status_codes = [200, 201, 400]
 
 
-zoho_people_auth = ZohoAuth(zp_oauth['client_id'], zp_oauth['client_secret'], zp_oauth['refresh_token'])
-zoho_books_auth = ZohoAuth(zb_oauth['client_id'], zb_oauth['client_secret'], zb_oauth['refresh_token'])
-zoho_creator_auth = ZohoAuth(zc_oauth['client_id'], zc_oauth['client_secret'], zc_oauth['refresh_token'])
-zoho_crm_auth = ZohoAuth(zcrm_oauth['client_id'], zcrm_oauth['client_secret'], zcrm_oauth['refresh_token'])
-
+zoho_people_auth = ZohoAuth("zoho_people")
+zoho_books_auth = ZohoAuth("zoho_books")
+zoho_creator_auth = ZohoAuth("zoho_creator")
+zoho_crm_auth = ZohoAuth("zoho_crm")
 
 def api_request(url, source, method, post_data):
     access_headers = {}
@@ -18,9 +16,6 @@ def api_request(url, source, method, post_data):
         access_headers = {
             'Authorization': f'Zoho-oauthtoken {zoho_people_auth.access_token}'
         }
-        # access_headers = {
-        #     "Authorization": f"Zoho-oauthtoken 1000.ea452f572250df570bd0dfe1b9e7ab41.3a0906c140c0204cbe64caeca5990cd0"
-        # }
     elif source == 'zoho_books':
         zoho_books_auth.get_or_refresh_access_token()
         access_headers = {
@@ -36,10 +31,6 @@ def api_request(url, source, method, post_data):
         access_headers = {
             'Authorization': f'Zoho-oauthtoken {zoho_crm_auth.access_token}'
         }
-        # print(access_headers)
-        # access_headers = {
-        #     'Authorization': f"Zoho-oauthtoken 1000.0c606d2dfc8927bfd32b6e74f56eece2.ff132881c3178e311aae65268e2e72f8"
-        # }
 
     if access_headers:
         if method == 'get':
@@ -47,8 +38,7 @@ def api_request(url, source, method, post_data):
         elif method == 'put':
             response = requests.put(url, headers=access_headers, data=json.dumps(post_data))
         elif method == 'post':
-            #response = requests.post(url, headers=access_headers, data=json.dumps(post_data))
-            response = requests.post(url, headers=access_headers, json=json.dumps(post_data))
+            response = requests.post(url, headers=access_headers, data=json.dumps(post_data))
         elif method == 'patch':
             response = requests.patch(url, headers=access_headers, data=json.dumps(post_data))
         if response.status_code in success_status_codes:

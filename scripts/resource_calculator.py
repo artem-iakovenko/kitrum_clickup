@@ -2,11 +2,13 @@
 from scripts.help_functions import str_to_unix, datetime_str_to_unix, str_to_date, get_working_days, clickup_get_tasks, get_zp_employees, get_zp_all_employees, get_clickup_users, crm_get_records_from, get_clickup_task_by_id, crm_get_records_by_id, clickup_update_cf, clickup_update_task_data, check_if_date_in_range
 from datetime import datetime
 from .config import date_ranges
+from secret_manager import access_secret
 
 INTERNAL_TASKS = []
 
 class ResourceCalculation:
     def __init__(self, start_date, end_date):
+        self.clickup_headers = {"Content-Type": "application/json", "Authorization": access_secret('kitrum-cloud', "clickup")}
         self.start_date = start_date
         self.end_date = end_date
         self.filter_start = str(datetime_str_to_unix(start_date, 2, 0)) if start_date else None
@@ -54,18 +56,18 @@ class ResourceCalculation:
                 return dev_info
 
     def launch(self):
-        self.clickup_users = get_clickup_users()
+        self.clickup_users = get_clickup_users(self.clickup_headers)
         self.zp_employees = get_zp_all_employees()
         self.potentials = crm_get_records_from("Deals", None)
-        self.month_blocks = clickup_get_tasks("901204980269", f"&include_closed=true&due_date_lt={self.filter_end}&due_date_gt={self.filter_start}")
-        self.month_leaves = clickup_get_tasks("901204775879", f"&include_closed=true&due_date_lt={self.filter_end}&due_date_gt={self.filter_start}")
+        self.month_blocks = clickup_get_tasks(self.clickup_headers, "901204980269", f"&include_closed=true&due_date_lt={self.filter_end}&due_date_gt={self.filter_start}")
+        self.month_leaves = clickup_get_tasks(self.clickup_headers, "901204775879", f"&include_closed=true&due_date_lt={self.filter_end}&due_date_gt={self.filter_start}")
         self.active_dev_infos = crm_get_records_from("Project_Details", "1576533000362341337")
-        internal_project = get_clickup_task_by_id("869775k91")
+        internal_project = get_clickup_task_by_id(self.clickup_headers, "869775k91")
         internal_task_ids = ["8696eea8p", "869775k91", "869775k91"]
         internal_project_subtasks = internal_project['subtasks'] if 'subtasks' in internal_project else []
         for internal_project_subtask in internal_project_subtasks:
             internal_task_ids.append(internal_project_subtask['id'])
-        self.month_resources = clickup_get_tasks("901204930768", f"&include_closed=true&due_date_lt={self.filter_end}&due_date_gt={self.filter_start}")
+        self.month_resources = clickup_get_tasks(self.clickup_headers, "901204930768", f"&include_closed=true&due_date_lt={self.filter_end}&due_date_gt={self.filter_start}")
         counter = 0
         for resource in self.month_resources:
             counter += 1
@@ -164,7 +166,7 @@ class ResourceCalculation:
             for leave_task_id in leave_task_ids:
                 leave_data = self.get_leave_details(leave_task_id)
                 if not leave_data:
-                    leave_data = get_clickup_task_by_id(leave_task_id)
+                    leave_data = get_clickup_task_by_id(self.clickup_headers, leave_task_id)
                 for custom_field in leave_data['custom_fields']:
                     if custom_field['id'] == "5078d821-4695-4e09-ae6c-81e29081ef66":
                         leave_hours += round(float(custom_field['value']), 2)
@@ -173,10 +175,10 @@ class ResourceCalculation:
             print(f"Total Blocks Available: {len(blocking_task_ids)}\n")
             for blocking_task_id in blocking_task_ids:
                 blocking_data = self.get_block_details(blocking_task_id)
+                if not blocking_data:
+                    blocking_data = get_clickup_task_by_id(self.clickup_headers, blocking_task_id)
                 print(f"\tBlocking Name: {blocking_data['name']}")
 
-                if not blocking_data:
-                    blocking_data = get_clickup_task_by_id(blocking_task_id)
                 start_date_unix = int(blocking_data['start_date'])
                 due_date_unix = int(blocking_data['due_date'])
 
@@ -251,7 +253,7 @@ class ResourceCalculation:
                 for leave_task_id in leave_task_ids:
                     leave_data = self.get_leave_details(leave_task_id)
                     if not leave_data:
-                        leave_data = get_clickup_task_by_id(leave_task_id)
+                        leave_data = get_clickup_task_by_id(self.clickup_headers, leave_task_id)
                     leave_start = datetime.utcfromtimestamp(int(leave_data['start_date']) / 1000).strftime('%Y-%m-%d')
                     leave_end = datetime.utcfromtimestamp(int(leave_data['due_date']) / 1000).strftime('%Y-%m-%d')
                     if str_to_date(leave_start) >= str_to_date(blocking_start_date) and str_to_date(leave_end) <= str_to_date(blocking_end_date):
@@ -346,31 +348,31 @@ class ResourceCalculation:
                         # input(f"Updating Final Date to {blocking_end_date}")
                         update_dict["due_date"] = str_to_unix(blocking_end_date)
                     if update_dict:
-                        primary_block_update = clickup_update_task_data(blocking_task_id, update_dict)
+                        primary_block_update = clickup_update_task_data(self.clickup_headers, blocking_task_id, update_dict)
                         print(f"PRIMARY TASK UPDATE: {primary_block_update['status']}")
                 # UPDATE AM IF NEEDED
                 if clickup_manager_id and clickup_manager_id != current_am_id:
                     # input(f"Updating AM from {current_am_id} to {clickup_manager_id}")
-                    cf_am_update = clickup_update_cf(blocking_task_id, "6400cee4-b94c-45a0-ac67-02ec18770c8e", {"add": [clickup_manager_id], "rem": [current_am_id]})
+                    cf_am_update = clickup_update_cf(self.clickup_headers, blocking_task_id, "6400cee4-b94c-45a0-ac67-02ec18770c8e", {"add": [clickup_manager_id], "rem": [current_am_id]})
                     print(f"AM UPDATE STATUS: {cf_am_update['status']}")
                 # UPDATE DEV IF NEEDED
                 if clickup_developer_id and clickup_developer_id != current_developer_id:
                     # input(f"Updating Developer from {current_developer_id} to {clickup_developer_id}")
-                    cf_dev_update = clickup_update_cf(blocking_task_id, "912a953f-4c89-44cb-844d-603111aa7eb1", {"add": [clickup_developer_id], "rem": [current_developer_id]})
+                    cf_dev_update = clickup_update_cf(self.clickup_headers, blocking_task_id, "912a953f-4c89-44cb-844d-603111aa7eb1", {"add": [clickup_developer_id], "rem": [current_developer_id]})
                     print(f"DEV UPDATE STATUS: {cf_dev_update['status']}")
                 # UPDATE BLOCKED HOURS IF NEEDED
                 if blocked != new_blocked:
                     # input(f"Updating Blocked Hours from {blocked} to {new_blocked}")
-                    cf_blocked_update = clickup_update_cf(blocking_task_id, "5078d821-4695-4e09-ae6c-81e29081ef66", str(new_blocked))
+                    cf_blocked_update = clickup_update_cf(self.clickup_headers, blocking_task_id, "5078d821-4695-4e09-ae6c-81e29081ef66", str(new_blocked))
                     print(f"BLOCKED HOURS UPDATE STATUS: {cf_blocked_update['status']}")
                 # UPDATE AVAILABLE HOURS IF NEEDED
                 if available != new_available:
                     # input(f"Updating Available Hours from {available} to {new_available}")
-                    cf_available_update = clickup_update_cf(blocking_task_id, "9a832c69-edab-40eb-a81d-03be6078b0d9", str(new_available))
+                    cf_available_update = clickup_update_cf(self.clickup_headers, blocking_task_id, "9a832c69-edab-40eb-a81d-03be6078b0d9", str(new_available))
                     print(f"AVAILABLE HOURS UPDATE STATUS: {cf_available_update['status']}")
                 if is_full_time_blocking and blocking_leave_hours > 0 and blocking_leave_hours != current_leave:
                     # input(f"Updating Leave Hours from {current_leave} to {blocking_leave_hours}")
-                    cf_leave_update = clickup_update_cf(blocking_task_id, "9ec43ad7-1d2a-404e-8a5e-fdfaa80e96bd", blocking_leave_hours)
+                    cf_leave_update = clickup_update_cf(self.clickup_headers, blocking_task_id, "9ec43ad7-1d2a-404e-8a5e-fdfaa80e96bd", blocking_leave_hours)
                     print(f"LEAVE HOURS UPDATE STATUS: {cf_leave_update['status']}")
 
             if exited_before_this_month:
@@ -403,27 +405,27 @@ class ResourceCalculation:
             # UPDATE FREE HOURS IF NEEDED
             if exited_before_this_month:
                 resource_update_dict = {"start_date": str_to_unix(self.start_date), "due_date": str_to_unix(self.end_date)}
-                primary_resource_update = clickup_update_task_data(resource_id, resource_update_dict)
+                primary_resource_update = clickup_update_task_data(self.clickup_headers, resource_id, resource_update_dict)
                 print(f"PRIMARY TASK UPDATE: {primary_resource_update['status']}")
             if new_resource_total_available != resource_total_available:
                 resource_update_dict = {"start_date": str_to_unix(resource_start_date), "due_date": str_to_unix(resource_end_date)}
-                primary_resource_update = clickup_update_task_data(resource_id, resource_update_dict)
+                primary_resource_update = clickup_update_task_data(self.clickup_headers, resource_id, resource_update_dict)
                 print(f"PRIMARY TASK UPDATE: {primary_resource_update['status']}")
-                cf_monthly_hours_update = clickup_update_cf(resource_id, "3fac0ff8-6981-463a-b7e0-a375f86aed24", str(new_resource_total_available))
+                cf_monthly_hours_update = clickup_update_cf(self.clickup_headers, resource_id, "3fac0ff8-6981-463a-b7e0-a375f86aed24", str(new_resource_total_available))
                 print(f"RESOURCE MONTHLY HOURS UPDATE STATUS: {cf_monthly_hours_update['status']}")
             if current_free_hours != resource_free_hours or resource_free_hours == 0:
                 # input(f"Updating Free Hours from {current_free_hours} to {resource_free_hours}")
-                cf_free_hours_update = clickup_update_cf(resource_id, "cf0b9445-8383-4d93-bc56-52a2c2c551b7", str(resource_free_hours))
+                cf_free_hours_update = clickup_update_cf(self.clickup_headers, resource_id, "cf0b9445-8383-4d93-bc56-52a2c2c551b7", str(resource_free_hours))
                 print(f"FREE HOURS UPDATE STATUS: {cf_free_hours_update['status']}")
             # UPDATE UTILIZATION IF NEEDED
             if current_utilization != utilization_percent or utilization_percent == 0:
                 # input(f"Updating Utilization from {current_utilization} to {utilization_percent}")
-                cf_utilization_update = clickup_update_cf(resource_id, "703dd683-1188-4427-a1a3-205733badd3f", str(utilization_percent))
+                cf_utilization_update = clickup_update_cf(self.clickup_headers, resource_id, "703dd683-1188-4427-a1a3-205733badd3f", str(utilization_percent))
                 print(f"UTILIZATION UPDATE STATUS: {cf_utilization_update['status']}")
             # UPDATE DEV IF NEEDED
             if clickup_developer_id and clickup_developer_id != resource_current_developer_id:
                 # input(f"Updating Developer from {resource_current_developer_id} to {clickup_developer_id}")
-                cf_dev_update = clickup_update_cf(resource_id, "912a953f-4c89-44cb-844d-603111aa7eb1", {"add": [clickup_developer_id], "rem": [resource_current_developer_id]})
+                cf_dev_update = clickup_update_cf(self.clickup_headers, resource_id, "912a953f-4c89-44cb-844d-603111aa7eb1", {"add": [clickup_developer_id], "rem": [resource_current_developer_id]})
                 print(f"DEV UPDATE STATUS: {cf_dev_update['status']}")
 
 

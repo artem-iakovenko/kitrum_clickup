@@ -2,13 +2,13 @@ import time
 import requests
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from credentials.api_creds import CLICKUP_HEADERS
 from scripts.help_functions import datetime_str_to_unix, str_to_date, get_working_days, get_timelogs, send_slack_notification
 from datetime import datetime, timezone, timedelta
 import pytz
 import json
+from secret_manager import access_secret
 from scripts.config import SLACK_CHANNEL_TIMELOGS
-
+from secret_manager import access_secret
 
 with open("project_files/user_timezones.json", "r") as json_file:
     USER_TIMEZONES = json.load(json_file)
@@ -22,6 +22,7 @@ LEAVES_LISTS = ['901204775879']
 
 class LogSyncer:
     def __init__(self, start_date, end_date, custom_user_emails):
+        self.clickup_headers = {"Content-Type": "application/json", "Authorization": access_secret('kitrum-cloud', "clickup")}
         self.start_date = start_date
         self.end_date = end_date
         self.search_start_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
@@ -36,13 +37,13 @@ class LogSyncer:
         self.all_timelogs = []
 
     def get_all_clickup_users(self):
-        response = requests.get("https://api.clickup.com/api/v2/team", headers=CLICKUP_HEADERS)
+        response = requests.get("https://api.clickup.com/api/v2/team", headers=self.clickup_headers)
         team_data = response.json()['teams'][0]
         self.team_id = team_data['id']
         self.clickup_users = team_data['members']
 
     def get_timelogs(self, user_id):
-        response = requests.get(f"https://api.clickup.com/api/v2/team/{self.team_id}/time_entries?assignee={user_id}&start_date={self.start_date_unix}&end_date={self.end_date_unix}", headers=CLICKUP_HEADERS)
+        response = requests.get(f"https://api.clickup.com/api/v2/team/{self.team_id}/time_entries?assignee={user_id}&start_date={self.start_date_unix}&end_date={self.end_date_unix}", headers=self.clickup_headers)
         return response.json()['data'] if response.status_code == 200 else []
 
     def get_zp_timelogs(self, user_email):
@@ -122,8 +123,9 @@ class LogSyncer:
 
 
 def cross_check_sync_launcher(start_date, end_date):
-    creds = service_account.Credentials.from_service_account_file(
-        'credentials/sheets.json', scopes=SHEET_SCOPES
+    sheets_json = json.loads(access_secret("kitrum-cloud", "google_sheets_service"))
+    creds = service_account.Credentials.from_service_account_info(
+        sheets_json, scopes=SHEET_SCOPES
     )
     service = build('sheets', 'v4', credentials=creds)
     date_obj = datetime.strptime(end_date, "%Y-%m-%d")
@@ -143,7 +145,7 @@ def cross_check_sync_launcher(start_date, end_date):
         valueInputOption='USER_ENTERED',
         body={"values": logs_handler.tracked_time_by_user_list}
     ).execute()
-    send_slack_notification(SLACK_CHANNEL_TIMELOGS, f"Crosscheck data has been formed for range *{start_date} - {end_date}*")
+    # send_slack_notification(SLACK_CHANNEL_TIMELOGS, f"Crosscheck data has been formed for range *{start_date} - {end_date}*")
 
 
 

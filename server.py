@@ -1,3 +1,4 @@
+from secret_manager import access_secret
 import json
 import threading
 from flask import Flask, request, jsonify
@@ -10,8 +11,19 @@ from scripts.available_resources import available_resources_collector
 
 app = Flask(__name__)
 
+def require_api_key(view_function):
+    from functools import wraps
+    @wraps(view_function)
+    def decorated_function(*args, **kwargs):
+        headers_api_key = request.headers.get("X-API-KEY")
+        if headers_api_key != access_secret("kitrum-cloud", "vm_api_key"):
+            return jsonify({"error": "Unauthorized"}), 401
+        return view_function(*args, **kwargs)
+    return decorated_function
+
 
 @app.route('/sync_cross_check', methods=['POST'])
+@require_api_key
 def sync_cross_check():
     print(f"Received Request to Sync Cross Check")
     payload_data = json.loads(request.stream.read().decode())
@@ -21,6 +33,7 @@ def sync_cross_check():
 
 
 @app.route('/push_timelogs_to_zp', methods=['POST'])
+@require_api_key
 def push_timelogs_to_zp():
     print(f"Received Request to Push Timelogs to Zoho People")
     payload_data = json.loads(request.stream.read().decode())
@@ -30,6 +43,7 @@ def push_timelogs_to_zp():
 
 
 @app.route('/create_timesheets', methods=['POST'])
+@require_api_key
 def create_timesheets():
     print(f"Received Request to Create Timesheets in Zoho People")
     payload_data = json.loads(request.stream.read().decode())
@@ -40,6 +54,7 @@ def create_timesheets():
 
 
 @app.route('/calculate_resources', methods=['POST'])
+@require_api_key
 def calculate_resources():
     print(f"Received Request to Calculate Resources")
     # payload_data = json.loads(request.stream.read().decode())
@@ -49,6 +64,7 @@ def calculate_resources():
 
 
 @app.route('/create_resources', methods=['POST'])
+@require_api_key
 def create_resources():
     print(f"Received Request to Create Resources")
     payload_data = json.loads(request.stream.read().decode())
@@ -59,6 +75,7 @@ def create_resources():
 
 
 @app.route('/update_available_resources', methods=['POST'])
+@require_api_key
 def update_available_resources():
     print(f"Received Request Update Available Resources")
     # payload_data = json.loads(request.stream.read().decode())
@@ -67,4 +84,5 @@ def update_available_resources():
     return jsonify({'status': 'triggered'}), 200
 
 
-app.run(host='0.0.0.0', port=5201)
+# app.run(host='0.0.0.0', port=5201)
+app.run(host='0.0.0.0', port=7261)

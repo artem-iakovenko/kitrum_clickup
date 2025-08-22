@@ -1,10 +1,10 @@
 import time
 import requests
-from credentials.api_creds import CLICKUP_HEADERS
 from scripts.help_functions import datetime_str_to_unix, str_to_date, get_zp_projects, get_zp_job_by_clickup_id, get_zp_job_by_name, update_zp_job, get_zp_employees, format_hours, create_zp_job, update_zp_project, get_zp_logs, push_timelogs_to_zp, delete_time_tracked, get_clickup_task_by_id, send_slack_notification
 from datetime import datetime, timezone, timedelta
 import pytz
 import json
+from secret_manager import access_secret
 from scripts.config import SLACK_CHANNEL_TIMELOGS
 
 
@@ -102,6 +102,8 @@ DEFAULT_PROJECTS_BY_BUDGET_OWNERS = {
 
 class LogSyncer:
     def __init__(self, start_date, end_date, custom_user_emails):
+        self.clickup_headers = {"Content-Type": "application/json", "Authorization": access_secret('kitrum-cloud', "clickup")}
+
         self.start_date = start_date
         self.end_date = end_date
         self.search_start_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
@@ -116,13 +118,13 @@ class LogSyncer:
         self.zp_projects = get_zp_projects()
 
     def get_all_clickup_users(self):
-        response = requests.get("https://api.clickup.com/api/v2/team", headers=CLICKUP_HEADERS)
+        response = requests.get("https://api.clickup.com/api/v2/team", headers=self.clickup_headers)
         team_data = response.json()['teams'][0]
         self.team_id = team_data['id']
         self.clickup_users = team_data['members']
 
     def get_timelogs(self, user_id):
-        response = requests.get(f"https://api.clickup.com/api/v2/team/{self.team_id}/time_entries?assignee={user_id}&start_date={self.start_date_unix}&end_date={self.end_date_unix}", headers=CLICKUP_HEADERS)
+        response = requests.get(f"https://api.clickup.com/api/v2/team/{self.team_id}/time_entries?assignee={user_id}&start_date={self.start_date_unix}&end_date={self.end_date_unix}", headers=self.clickup_headers)
         return response.json()['data'] if response.status_code == 200 else []
 
     def search_zp_user(self, email):
@@ -208,6 +210,7 @@ class LogSyncer:
                 return "Private Task available..."
             if not timelog_task:
                 skipped_timelogs += 1
+                print("skipping t...")
                 continue
             timelog_task_type = timelog_task['custom_type']
 
@@ -240,7 +243,7 @@ class LogSyncer:
             if timelog_task_id in clickup_tasks_details:
                 clickup_task_details = clickup_tasks_details[timelog_task_id]
             else:
-                clickup_task_details = get_clickup_task_by_id(timelog_task_id)
+                clickup_task_details = get_clickup_task_by_id(self.clickup_headers, timelog_task_id)
 
             # PROJECT CASES
             zp_project_id = None
@@ -283,12 +286,12 @@ class LogSyncer:
             elif timelog_list_id in ADMIN_TASK_TRACKER_LISTS:
                 budget_team_owner = None
                 responsible_team = None
-                custom_fields = clickup_task_details['custom_fields']
-                for custom_field in custom_fields:
-                    if custom_field['id'] == "7624aca5-8aeb-4eb0-8961-a72b78b2afbc" and 'value' in custom_field:
-                        budget_team_owner = custom_field['value'][0]['name']
-                    if custom_field['id'] == "c8658ab2-9e29-40bb-89f6-7e8d9d799d08" and 'value' in custom_field:
-                        responsible_team = custom_field['value'][0]['name']
+                # custom_fields = clickup_task_details['custom_fields']
+                # for custom_field in custom_fields:
+                #     if custom_field['id'] == "7624aca5-8aeb-4eb0-8961-a72b78b2afbc" and 'value' in custom_field:
+                #         budget_team_owner = custom_field['value'][0]['name']
+                #     if custom_field['id'] == "c8658ab2-9e29-40bb-89f6-7e8d9d799d08" and 'value' in custom_field:
+                #         responsible_team = custom_field['value'][0]['name']
                 if budget_team_owner and budget_team_owner in DEFAULT_PROJECTS_BY_BUDGET_OWNERS:
                     zp_project_id = DEFAULT_PROJECTS_BY_BUDGET_OWNERS[budget_team_owner]
                 elif responsible_team and responsible_team in DEFAULT_PROJECTS_BY_BUDGET_OWNERS:
@@ -384,13 +387,15 @@ class LogSyncer:
                 "hours": format_hours(round(timelog_duration_hours, 2)),
                 "workItem": timelog_description,
                 "description": timelog_id,
-                "clickup_task_id": timelog_task_id
+                # "clickup_task_id": timelog_task_id
             }
             if zp_project_id not in time_by_projects:
                 time_by_projects[zp_project_id] = round(timelog_duration_hours, 2)
             else:
                 time_by_projects[zp_project_id] += round(timelog_duration_hours, 2)
 
+            # FIXES HERE
+            # if zp_timelog_entry['billableStatus'] == "non-billable":
             user_zp_timelogs.append(zp_timelog_entry)
             total_time += round(timelog_duration_hours, 2)
 
@@ -427,6 +432,7 @@ class LogSyncer:
             user_email = user['user']['email']
             if self.custom_user_emails and user_email not in self.custom_user_emails:
                 continue
+
             counter += 1
             print("------------" * 10)
             print(f"\t{counter}. Current User Email: {user_email}")
@@ -444,6 +450,6 @@ def timelog_sync_launcher(start_date, end_date, users):
     logs_handler = LogSyncer(start_date, end_date, users)
     logs_handler.launcher()
     users_str = "All" if not users else ", ".join(users)
-    send_slack_notification(SLACK_CHANNEL_TIMELOGS, f"Timelogs Sync from Clickup to Zoho People has been completed for *{users_str}* users")
+    # send_slack_notification(SLACK_CHANNEL_TIMELOGS, f"Timelogs Sync from Clickup to Zoho People has been completed for *{users_str}* users")
 
 
