@@ -84,5 +84,5 @@ def update_available_resources():
     return jsonify({'status': 'triggered'}), 200
 
 
-# app.run(host='0.0.0.0', port=5201)
-app.run(host='0.0.0.0', port=7261)
+app.run(host='0.0.0.0', port=5201)
+# app.run(host='0.0.0.0', port=7261)
