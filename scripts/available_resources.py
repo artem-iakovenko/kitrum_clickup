@@ -136,11 +136,11 @@ class AvailableResources:
             custom_fields = clickup_block['custom_fields']
 
             for custom_field in custom_fields:
-                if custom_field['id'] == "912a953f-4c89-44cb-844d-603111aa7eb1" and 'value' in custom_field:
+                if custom_field['id'] == "912a953f-4c89-44cb-844d-603111aa7eb1" and custom_field['value']:
                     related_developer_id, related_developer_email = custom_field['value'][0]['id'], custom_field['value'][0]['email']
-                elif custom_field['id'] == "e6b5529b-167f-45f5-998c-cbeece722706" and 'value' in custom_field:
+                elif custom_field['id'] == "e6b5529b-167f-45f5-998c-cbeece722706" and custom_field['value']:
                     zcrm_dev_url = custom_field['value']
-                elif custom_field['id'] == "cf0b9445-8383-4d93-bc56-52a2c2c551b7" and 'value' in custom_field:
+                elif custom_field['id'] == "cf0b9445-8383-4d93-bc56-52a2c2c551b7" and custom_field['value']:
                     free_hours = round(float(custom_field['value']), 2)
             print(free_hours)
             if related_developer_id and free_hours > 0:
